@@ -39,8 +39,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.webkit:webkit:1.9.0")
     implementation("com.google.android.material:material:1.11.0")
-    implementation("com.mohanlv:base:1.2.25")
-    implementation("com.mohanlv:router:1.2.4")
+    implementation("com.mohanlv:base:1.2.28")
+    implementation("com.mohanlv:router:1.2.10")
 
     // 路由注解
     compileOnly("com.mohanlv:router-annotation:0.0.6")
@@ -85,7 +85,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/lvtong199881/AndroidComponentApp")
+            url = uri("https://maven.pkg.github.com/lvtong199881/PackagesMaven")
             credentials {
                 username = "lvtong199881"
                 password = System.getenv("GITHUB_TOKEN") ?: run {

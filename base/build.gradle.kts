@@ -46,15 +46,15 @@ dependencies {
     api("io.coil-kt:coil:2.5.0")
 
     // Startup 框架
-    api(project(":startup"))
+    api("com.mohanlv:startup:1.2.29")
     kapt("com.mohanlv:init-annotator:0.0.6")
 
     // 日志模块
-    api(project(":logger"))
+    api("com.mohanlv:logger:1.2.26")
 
     // 核心基础 SDK（通过 api() 传递依赖，供业务模块使用）
-    api(project(":router"))
-    api(project(":network"))
+    api("com.mohanlv:router:1.2.10")
+    api("com.mohanlv:network:1.2.15")
 
     testImplementation("junit:junit:4.13.2")
 }
@@ -107,7 +107,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/lvtong199881/AndroidComponentApp")
+            url = uri("https://maven.pkg.github.com/lvtong199881/PackagesMaven")
             credentials {
                 username = "lvtong199881"
                 password = System.getenv("GITHUB_TOKEN") ?: run {

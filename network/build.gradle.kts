@@ -34,12 +34,12 @@ dependencies {
     api("androidx.core:core-ktx:1.12.0")
 
     // Startup 框架
-    api(project(":startup"))
+    api("com.mohanlv:startup:1.2.29")
     api("com.mohanlv:router-annotation:0.0.6")
     kapt("com.mohanlv:init-annotator:0.0.6")
 
     // 日志模块
-    api(project(":logger"))
+    api("com.mohanlv:logger:1.2.26")
 
     // Retrofit + OkHttp
     api("com.squareup.retrofit2:retrofit:2.9.0")
@@ -120,7 +120,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/lvtong199881/AndroidComponentApp")
+            url = uri("https://maven.pkg.github.com/lvtong199881/PackagesMaven")
             credentials {
                 username = "lvtong199881"
                 password = System.getenv("GITHUB_TOKEN") ?: run {
