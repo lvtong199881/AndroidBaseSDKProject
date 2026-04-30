@@ -27,7 +27,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
+    compilerOptions { jvmTarget.set(JavaLanguageVersion.of(17)) }
     buildFeatures { viewBinding = true }
 }
 
@@ -52,7 +52,7 @@ dependencies {
     implementation("com.mohanlv:router:1.2.10")
     implementation("com.mohanlv:startup:1.2.29")
     compileOnly("com.mohanlv:router-annotation:0.0.6")
-    kapt("com.mohanlv:router-annotator:0.0.5")
+    kapt("com.mohanlv:router-annotator:1.0.1")
     implementation("com.mohanlv:base:1.2.28")
     implementation("com.mohanlv:logger:1.2.26")
 

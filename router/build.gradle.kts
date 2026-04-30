@@ -27,7 +27,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
+    compilerOptions { jvmTarget.set(JavaLanguageVersion.of(17)) }
 }
 
 dependencies {
@@ -37,10 +37,10 @@ dependencies {
 
     // Startup 框架
     api("com.mohanlv:startup:1.2.29")
-    kapt("com.mohanlv:init-annotator:0.0.6")
+    kapt("com.mohanlv:init-annotator:1.0.1")
 
     // 路由注解处理器（KAPT）
-    kapt("com.mohanlv:router-annotator:0.0.6")
+    kapt("com.mohanlv:router-annotator:1.0.1")
 
     testImplementation("junit:junit:4.13.2")
 }
