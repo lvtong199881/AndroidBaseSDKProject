@@ -31,19 +31,7 @@ jobs:
 
       - name: Write Python version parser
         run: |
-          cat > /tmp/get_version.py << 'PYEOF'
-import json,sys
-
-data=json.load(open(sys.argv[1]))
-
-if isinstance(data,list) and len(data)>0:
-    versions=[v.get('name','') for v in data if v.get('name')]
-    if versions:
-        def parse(v):
-            try: return tuple(int(x) for x in v.split('.'))
-            except: return (0, )
-        print(max(versions,key=parse))
-PYEOF
+          echo 'aW1wb3J0IGpzb24sc3lzCmRhdGE9anNvbi5sb2FkKG9wZW4oc3lzLmFyZ3ZbMV0pKQppZiBpc2luc3RhbmNlKGRhdGEsbGlzdCkgYW5kIGxlbihkYXRhKT4wOgogICAgdmVyc2lvbnM9W3YuZ2V0KCduYW1lJywnJykgZm9yIHYgaW4gZGF0YSBpZiB2LmdldCgnbmFtZScpXQogICAgaWYgdmVyc2lvbnM6CiAgICAgICAgZGVmIHBhcnNlKHYpOgogICAgICAgICAgICB0cnk6IHJldHVybiB0dXBsZShpbnQoeCkgZm9yIHggaW4gdi5zcGxpdCgnLicpKQogICAgICAgICAgICBleGNlcHQ6IHJldHVybiAoMCwpCiAgICAgICAgcHJpbnQobWF4KHZlcnNpb25zLGtleT1wYXJzZSkpCg==' | base64 -d > /tmp/get_version.py
 
       - name: Detect changed modules and compute versions
         id: detect
@@ -84,12 +72,20 @@ PYEOF
 
           BUILD_VERSIONS=""
 
+          # Debug: 检查 token
+          echo "DEBUG: Token length: ${#GITHUB_TOKEN}"
+          if [ ${#GITHUB_TOKEN} -eq 0 ]; then
+            echo "ERROR: GITHUB_TOKEN is empty or not set"
+          fi
+
           for module in $(echo "$MODULES_TO_PUBLISH" | tr ',' ' '); do
             PACKAGE_NAME="com.mohanlv.${module}"
             API_URL="https://api.github.com/users/lvtong199881/packages/maven/${PACKAGE_NAME}/versions?per_page=100"
-            curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "$API_URL" -o /tmp/api_response.json
-            LATEST_VERSION=$(python3 /tmp/get_version.py /tmp/api_response.json 2>/dev/null || echo "")
-            echo "DEBUG: $module latest version: $LATEST_VERSION"
+            echo "DEBUG: Calling API for $module..."
+            echo "DEBUG: API_URL=$API_URL"
+            curl -s -v -H "Authorization: Bearer ${GITHUB_TOKEN}" "$API_URL" -o /tmp/api_response.json 2>&1 | head -20
+            LATEST_VERSION=$(python3 /tmp/get_version.py /tmp/api_response.json 2>/dev/null)
+            echo "DEBUG: LATEST_VERSION=$LATEST_VERSION"
             if [ -z "$LATEST_VERSION" ]; then
               NEW_VERSION="1.0.0"
             else
