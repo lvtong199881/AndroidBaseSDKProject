@@ -30,11 +30,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 }
+
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
@@ -47,7 +44,7 @@ dependencies {
 
     // Startup 框架
     api("com.mohanlv:startup:1.2.29")
-    kapt("com.mohanlv:init-annotator:0.0.6")
+    kapt("com.mohanlv:init-annotator:1.0.1")
 
     // 日志模块
     api("com.mohanlv:logger:1.2.26")

@@ -27,7 +27,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    compilerOptions { jvmTarget.set(JavaLanguageVersion.of(17)) }
     buildFeatures { viewBinding = true }
 }
 
