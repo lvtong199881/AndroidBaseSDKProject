@@ -50,7 +50,7 @@ dependencies {
     // 依赖 router（获取 @Route 注解）
     implementation("com.mohanlv:router:1.2.10")
     implementation("com.mohanlv:startup:1.2.29")
-    compileOnly("com.mohanlv:router-annotation:0.0.6")
+    compileOnly("com.mohanlv:router-annotation:1.0.1")
     kapt("com.mohanlv:router-annotator:1.0.1")
     implementation("com.mohanlv:base:1.2.28")
     implementation("com.mohanlv:logger:1.2.26")
