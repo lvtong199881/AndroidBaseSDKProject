@@ -13,10 +13,11 @@ jobs:
       contents: write
       packages: write
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      GITHUB_TOKEN: ${{ secrets.COMPONENT_HOST_APP_TOKEN }}
 
     steps:
-      - name: Checkout
+      - name: Checkout Components
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -71,11 +72,20 @@ jobs:
 
           BUILD_VERSIONS=""
 
+          # Debug: 检查 token
+          echo "DEBUG: Token length: ${#GITHUB_TOKEN}"
+          if [ ${#GITHUB_TOKEN} -eq 0 ]; then
+            echo "ERROR: GITHUB_TOKEN is empty or not set"
+          fi
+
           for module in $(echo "$MODULES_TO_PUBLISH" | tr ',' ' '); do
             PACKAGE_NAME="com.mohanlv.${module}"
             API_URL="https://api.github.com/users/lvtong199881/packages/maven/${PACKAGE_NAME}/versions?per_page=100"
-            curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "$API_URL" -o /tmp/api_response.json
+            echo "DEBUG: Calling API for $module..."
+            echo "DEBUG: API_URL=$API_URL"
+            curl -s -v -H "Authorization: Bearer ${GITHUB_TOKEN}" "$API_URL" -o /tmp/api_response.json 2>&1 | head -20
             LATEST_VERSION=$(python3 /tmp/get_version.py /tmp/api_response.json 2>/dev/null)
+            echo "DEBUG: LATEST_VERSION=$LATEST_VERSION"
             if [ -z "$LATEST_VERSION" ]; then
               NEW_VERSION="1.0.0"
             else
@@ -106,7 +116,7 @@ jobs:
       - name: Build and publish changed modules
         id: build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COMPONENT_HOST_APP_TOKEN }}
         run: |
           BUILD_VERSIONS="${{ steps.detect.outputs.build-versions }}"
 
@@ -136,10 +146,11 @@ jobs:
             ./gradlew :${module}:publishMavenPublicationToGitHubPackagesRepository -P${module}.version=${VERSION} --no-daemon --stacktrace 2>&1 | tee /tmp/publish_output.txt
             PUBLISH_EXIT=${PIPESTATUS[0]}
             set -e
-
+          
             if [ ${PUBLISH_EXIT} -ne 0 ]; then
               if grep -q "409\|Conflict" /tmp/publish_output.txt 2>/dev/null; then
                 echo "!! Publish 409 conflict detected, detecting actual latest version..."
+                # 重新获取实际最新版本
                 MODULE_API_URL="https://api.github.com/users/lvtong199881/packages/maven/com.mohanlv.${module}/versions?per_page=100"
                 curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "$MODULE_API_URL" > /tmp/api_response.json
                 ACTUAL_LATEST=$(python3 /tmp/get_version.py /tmp/api_response.json 2>/dev/null || echo "")
@@ -161,6 +172,55 @@ jobs:
                   FAILED_MODULES="${FAILED_MODULES},${module}"
                   continue
                 fi
+              elif grep -q "401\|Unauthorized" /tmp/publish_output.txt 2>/dev/null; then
+                echo "!! Publish 401 Unauthorized, detecting actual latest version..."
+                MODULE_API_URL="https://api.github.com/users/lvtong199881/packages/maven/com.mohanlv.${module}/versions?per_page=100"
+                curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "$MODULE_API_URL" > /tmp/api_response.json
+                ACTUAL_LATEST=$(python3 /tmp/get_version.py /tmp/api_response.json 2>/dev/null || echo "")
+                if [ -z "$ACTUAL_LATEST" ]; then
+                  echo "!! Could not determine latest version for 401 retry, adding to failed list"
+                  FAILED_MODULES="${FAILED_MODULES},${module}"
+                  continue
+                fi
+                if [ "$ACTUAL_LATEST" = "$VERSION" ]; then
+                  echo ">>> 401 on same version ($VERSION), retrying after 5s..."
+                  sleep 5
+                  set +e
+                  ./gradlew :${module}:publishMavenPublicationToGitHubPackagesRepository -P${module}.version=${VERSION} --no-daemon -q
+                  if [ $? -eq 0 ]; then
+                    echo "✓ $module v${VERSION} published (retry successful)"
+                  else
+                    echo "!! Same version still fails, incrementing to next version..."
+                    LAST_NUM=$(echo $VERSION | awk -F'.' '{print $3}')
+                    retry_version=$(echo $VERSION | awk -F'.' -v n="$((LAST_NUM + 1))" '{OFS="."; $3=n; print}')
+                    echo ">>> Retrying with version $retry_version"
+                    ./gradlew :${module}:publishMavenPublicationToGitHubPackagesRepository -P${module}.version=${retry_version} --no-daemon -q
+                    if [ $? -eq 0 ]; then
+                      echo "✓ $module v${retry_version} published (retry successful)"
+                      BUILD_VERSIONS=$(echo "$BUILD_VERSIONS" | sed "s/${module}:${VERSION}/${module}:${retry_version}/")
+                    else
+                      echo "!! $module v${retry_version} retry failed, adding to failed list"
+                      FAILED_MODULES="${FAILED_MODULES},${module}"
+                      continue
+                    fi
+                  fi
+                  set -e
+                else
+                  LAST_NUM=$(echo $ACTUAL_LATEST | awk -F'.' '{print $3}')
+                  retry_version=$(echo $ACTUAL_LATEST | awk -F'.' -v n="$((LAST_NUM + 1))" '{OFS="."; $3=n; print}')
+                  echo ">>> Retrying 401 with version $retry_version"
+                  set +e
+                  ./gradlew :${module}:publishMavenPublicationToGitHubPackagesRepository -P${module}.version=${retry_version} --no-daemon -q
+                  if [ $? -eq 0 ]; then
+                    echo "✓ $module v${retry_version} published (retry successful)"
+                    BUILD_VERSIONS=$(echo "$BUILD_VERSIONS" | sed "s/${module}:${VERSION}/${module}:${retry_version}/")
+                  else
+                    echo "!! $module publish retry failed, adding to failed list"
+                    FAILED_MODULES="${FAILED_MODULES},${module}"
+                    continue
+                  fi
+                  set -e
+                fi
               else
                 echo "!! $module publish failed (exit ${PUBLISH_EXIT}), adding to failed list"
                 FAILED_MODULES="${FAILED_MODULES},${module}"
@@ -178,6 +238,7 @@ jobs:
             echo "  $FAILED_MODULES"
             echo "These modules will not be included in the release."
             echo "========================================"
+            # Remove failed modules from BUILD_VERSIONS for release
             for failed in $(echo "$FAILED_MODULES" | tr ',' ' '); do
               BUILD_VERSIONS=$(echo "$BUILD_VERSIONS" | sed "s/,*${failed}:[^,]*/,/g" | sed 's/^,//;s/,$//')
             done
@@ -209,7 +270,7 @@ jobs:
           echo "TAG_NAME=v${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "Created tag: v${TAG_NAME}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COMPONENT_HOST_APP_TOKEN }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -226,4 +287,40 @@ jobs:
             ${{ steps.detect.outputs.build-versions }}
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.COMPONENT_HOST_APP_TOKEN }}
+
+      - name: Update ComponentHostApp
+        env:
+          COMPONENT_HOST_APP_TOKEN: ${{ secrets.COMPONENT_HOST_APP_TOKEN }}
+        run: |
+          BUILD_VERSIONS="${{ steps.detect.outputs.build-versions }}"
+          echo "========================================"
+          echo "Updating ComponentHostApp"
+          echo "Build versions: $BUILD_VERSIONS"
+          echo "========================================"
+
+          cd ..
+          git clone "https://x-access-token:${COMPONENT_HOST_APP_TOKEN}@github.com/lvtong199881/ComponentHostApp.git"
+          cd ComponentHostApp
+          git checkout main
+
+          IFS=',' read -ra VERSIONS_ARRAY <<< "$BUILD_VERSIONS"
+          for entry in "${VERSIONS_ARRAY[@]}"; do
+            module="${entry%%:*}"
+            version="${entry#*:}"
+            echo "Updating com.mohanlv:${module} to ${version}"
+            sed -i.bak -E "s/(com\.mohanlv:${module}:)[0-9.]*()/\1${version}\2/g" app/build.gradle.kts
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update components to new versions"
+            git push
+            echo "✓ ComponentHostApp updated"
+          fi
+# CI test: no module changes
