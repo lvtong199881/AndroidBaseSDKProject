@@ -10,7 +10,7 @@ subprojects {
                 repositories {
                     maven {
                         name = "GitHubPackages"
-                        url = uri("https://maven.pkg.github.com/lvtong199881/AndroidBaseSDKProject")
+                        url = uri("https://maven.pkg.github.com/lvtong199881/PackagesMaven")
                         credentials {
                             username = "lvtong199881"
                             password = System.getenv("GITHUB_TOKEN") ?: ""
